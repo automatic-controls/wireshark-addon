@@ -1,0 +1,300 @@
+<!--
+  BSD 3-Clause License
+  Copyright (c) 2024, Automatic Controls Equipment Systems, Inc.
+  Contributors: Cameron Vogt (@cvogt729)
+-->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>
+      Wireshark Analyzer
+    </title>
+    <link rel="stylesheet" type="text/css" href="../../../../../root/webapp/main.css"/>
+    <script>
+      function toDate(epochMilli){
+        if (epochMilli==0){
+          return "?";
+        }
+        const d = new Date(epochMilli);
+        return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"\n"+pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds());
+      }
+      function pad(x){
+        if (x>9){
+          return String(x);
+        }else{
+          return "0"+String(x);
+        }
+      }
+      function setStatus(color,text){
+        statusBox.innerText = text;
+        statusBox.style.color = color;
+      }
+      function disableChanges(){
+        changeAllowed = false;
+        deleteAllButton.disabled = true;
+        toggleDismissed.disabled = true;
+        refreshButton.disabled = true;
+        for (const i of document.getElementById("alarm_body").getElementsByTagName("BUTTON")){
+          i.disabled = true;
+        }
+      }
+      function enableChanges(){
+        changeAllowed = true;
+        deleteAllButton.disabled = false;
+        toggleDismissed.disabled = false;
+        refreshButton.disabled = false;
+        for (const i of document.getElementById("alarm_body").getElementsByTagName("BUTTON")){
+          i.disabled = false;
+        }
+      }
+      function refresh(){
+        if (!changeAllowed){
+          return;
+        }
+        disableChanges();
+        const req = new XMLHttpRequest();
+        req.open("POST","__PREFIX__/alarms?type=refresh");
+        req.setRequestHeader("content-type", "application/x-www-form-urlencoded");
+        req.timeout = 10000;
+        req.onreadystatechange = function(){
+          if (this.readyState===4){
+            if (this.status===200){
+              parseRefresh(this.responseText);
+            }else if (this.status==0){
+              setStatus("red","Request timed out.");
+            }else{
+              setStatus("red","HTTP Error "+this.status);
+            }
+            enableChanges();
+          }
+        };
+        setStatus("lightgreen","Refreshing...");
+        req.send();
+      }
+      function parseRefresh(s){
+        try{
+          const data = JSON.parse(s).sort((a,b)=>{
+            return b["time"]-a["time"];
+          });
+          const body = document.getElementById("alarm_body");
+          const hideDismissed = document.getElementById("toggleDismissed").checked;
+          for (const x of data){
+            const id = x["id"];
+            const header = x["header"];
+            const desc = x["desc"];
+            const time = toDate(x["time"]);
+            const dismissed = x["dismissed"];
+            const current = x["current"];
+            const tr = document.createElement("TR");
+            const td_time = document.createElement("TD");
+            const td_alarm = document.createElement("TD");
+            const td_desc = document.createElement("TD");
+            const td_actions = document.createElement("TD");
+            td_time.innerText = time;
+            td_alarm.innerText = header;
+            td_desc.innerText = desc;
+            const resolveButton = document.createElement("BUTTON");
+            resolveButton.innerText = "Resolve";
+            resolveButton.className = "e";
+            resolveButton.onclick = ()=>{
+              if (!changeAllowed){
+                return;
+              }
+              disableChanges();
+              const req = new XMLHttpRequest();
+              req.open("POST","__PREFIX__/alarms?type=resolve");
+              req.setRequestHeader("content-type", "application/x-www-form-urlencoded");
+              req.timeout = 10000;
+              req.onreadystatechange = function(){
+                if (this.readyState===4){
+                  if (this.status===200){
+                    window.open(this.responseText, '_blank').focus();
+                    setStatus("lightgreen","Success.");
+                  }else if (this.status==0){
+                    setStatus("red","Request timed out.");
+                  }else if (this.status==404){
+                    setStatus("red","Could not locate source.");
+                  }else{
+                    setStatus("red","HTTP Error "+this.status);
+                  }
+                  enableChanges();
+                }
+              };
+              setStatus("lightgreen","Submitting...");
+              req.send("id="+encodeURIComponent(id));
+            };
+            td_actions.appendChild(resolveButton);
+            td_actions.appendChild(document.createElement("BR"));
+            tr.dismissed = dismissed;
+            const dismissFunc = ()=>{
+              tr.style.backgroundColor = "#404040";
+            };
+            if (dismissed){
+              dismissFunc();
+              if (hideDismissed){
+                tr.style.display = "none";
+              }else{
+                tr.style.display = "table-row";
+              }
+            }else{
+              if (!current){
+                tr.style.backgroundColor = "#202020";
+              }
+              tr.style.display = "table-row";
+              const dismissButton = document.createElement("BUTTON");
+              dismissButton.innerText = "Dismiss";
+              dismissButton.className = "e";
+              dismissButton.onclick = ()=>{
+                if (!changeAllowed){
+                  return;
+                }
+                disableChanges();
+                const req = new XMLHttpRequest();
+                req.open("POST","__PREFIX__/alarms?type=dismiss");
+                req.setRequestHeader("content-type", "application/x-www-form-urlencoded");
+                req.timeout = 10000;
+                req.onreadystatechange = function(){
+                  if (this.readyState===4){
+                    if (this.status===200){
+                      dismissFunc();
+                      tr.dismissed = true;
+                      if (document.getElementById("toggleDismissed").checked){
+                        tr.style.display = "none";
+                      }
+                      td_actions.removeChild(dismissButton);
+                      setStatus("lightgreen","Success.");
+                    }else if (this.status==0){
+                      setStatus("red","Request timed out.");
+                    }else{
+                      setStatus("red","HTTP Error "+this.status);
+                    }
+                    enableChanges();
+                  }
+                };
+                setStatus("lightgreen","Submitting...");
+                req.send("id="+encodeURIComponent(id));
+              };
+              td_actions.appendChild(dismissButton);
+              td_actions.appendChild(document.createElement("BR"));
+            }
+            const deleteButton = document.createElement("BUTTON");
+            deleteButton.innerText = "Delete";
+            deleteButton.className = "e";
+            deleteButton.onclick = ()=>{
+              if (!changeAllowed){
+                return;
+              }
+              disableChanges();
+              const req = new XMLHttpRequest();
+              req.open("POST","__PREFIX__/alarms?type=delete");
+              req.setRequestHeader("content-type", "application/x-www-form-urlencoded");
+              req.timeout = 10000;
+              req.onreadystatechange = function(){
+                if (this.readyState===4){
+                  if (this.status===200){
+                    body.removeChild(tr);
+                    setStatus("lightgreen","Success.");
+                  }else if (this.status==0){
+                    setStatus("red","Request timed out.");
+                  }else{
+                    setStatus("red","HTTP Error "+this.status);
+                  }
+                  enableChanges();
+                }
+              };
+              setStatus("lightgreen","Submitting...");
+              req.send("id="+encodeURIComponent(id));
+            };
+            td_actions.appendChild(deleteButton);
+            tr.appendChild(td_time);
+            tr.appendChild(td_alarm);
+            tr.appendChild(td_desc);
+            tr.appendChild(td_actions);
+            body.appendChild(tr);
+          }
+          setStatus("lightgreen","Success.");
+        }catch(e){
+          console.error(e);
+          setStatus("red","Invalid Response");
+        }
+      }
+      function deleteAll(){
+        if (!changeAllowed){
+          return;
+        }
+        disableChanges();
+        const req = new XMLHttpRequest();
+        req.open("POST","__PREFIX__/alarms?type=reset");
+        req.setRequestHeader("content-type", "application/x-www-form-urlencoded");
+        req.timeout = 10000;
+        req.onreadystatechange = function(){
+          if (this.readyState===4){
+            if (this.status===200){
+              document.getElementById("alarm_body").replaceChildren();
+              setStatus("lightgreen","Success.");
+            }else if (this.status==0){
+              setStatus("red","Request timed out.");
+            }else{
+              setStatus("red","HTTP Error "+this.status);
+            }
+            enableChanges();
+          }
+        };
+        setStatus("lightgreen","Submitting...");
+        req.send();
+      }
+      function showHideDismissed(){
+        if (!changeAllowed){
+          return;
+        }
+        const hide = document.getElementById("toggleDismissed").checked;
+        for (const tr of document.getElementById("alarm_body").getElementsByTagName("TR")){
+          if (tr.dismissed){
+            if (hide){
+              tr.style.display = "none";
+            }else{
+              tr.style.display = "table-row";
+            }
+          }
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div style="text-align:center">
+      <h1 id="mainTitle">Packet Alarms</h1>
+      <div style="position:sticky;top:0;width:100%;background-color:black;padding-top:0.75em;border-bottom:1px solid gray;border-top:1px solid gray">
+        <div>
+          <a class="e" href="__PREFIX__/index">Configuration</a>
+          <a class="e" href="__PREFIX__/stats">Statistics</a>
+          <a class="e" href="__PREFIX__/index?type=download" target="_blank" download="data.pcap">Download Packets</a>
+          <a class="e" href="__DOCUMENTATION__" target="_blank">Documentation</a>
+        </div>
+        <div style="padding-top:0.5em">
+          <button class="e" id="refreshButton" onclick="refresh()">Refresh</button>
+          <div class="divGrouping" style="user-select:none;">
+            <label for="toggleDismissed">Hide Dismissed</label>
+            <input type="checkbox" id="toggleDismissed" oninput="showHideDismissed()" checked style="width:1.3em;height:1.3em;vertical-align:middle;">
+          </div>
+          <button class="e" id="deleteAllButton" onclick="deleteAll()">Delete All</button>
+        </div>
+        <div class="divGrouping">
+          <label for="statusBox">Status:</label>
+          <span id="statusBox">Refreshing...</span>
+        </div>
+      </div>
+      <br>
+      <table>
+        <thead>
+          <tr><th>Timestamp</th><th>Alarm</th><th>Description</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="alarm_body">
+        </tbody>
+      </table>
+    </div>
+    <script>
+      var changeAllowed = true;
+      refresh();
+    </script>
+  </body>
+</html>

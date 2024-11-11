@@ -1,0 +1,745 @@
+<!--
+  BSD 3-Clause License
+  Copyright (c) 2024, Automatic Controls Equipment Systems, Inc.
+  Contributors: Cameron Vogt (@cvogt729)
+-->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>
+      Wireshark Analyzer
+    </title>
+    <link rel="stylesheet" type="text/css" href="../../../../../root/webapp/main.css"/>
+    <script>
+      function registerChange(){
+        if (!changes){
+          changes = true;
+          mainTitle.innerText = "* Wireshark Analyzer *";
+          document.title = mainTitle.innerText;
+        }
+      }
+      function unregisterChange(){
+        if (changes){
+          changes = false;
+          mainTitle.innerText = "Wireshark Analyzer";
+          document.title = mainTitle.innerText;
+        }
+      }
+      function checkSave(){
+        if (changes){
+          alert("Please save changes before continuing.");
+          return false;
+        }else{
+          return true;
+        }
+      }
+      function resize(input){
+        const styles = window.getComputedStyle(input);
+        hiddenSpan.style.fontFamily = styles.fontFamily;
+        hiddenSpan.style.fontSize = styles.fontSize;
+        hiddenSpan.style.fontStyle = styles.fontStyle;
+        hiddenSpan.style.fontWeight = styles.fontWeight;
+        hiddenSpan.style.letterSpacing = styles.letterSpacing;
+        hiddenSpan.style.textTransform = styles.textTransform;
+        hiddenSpan.style.borderLeftWidth = styles.borderLeftWidth;
+        hiddenSpan.style.borderRightWidth = styles.borderRightWidth;
+        hiddenSpan.style.paddingLeft = styles.paddingLeft;
+        hiddenSpan.style.paddingRight = styles.paddingRight;
+        hiddenSpan.innerText = input.value;
+        input.style.width = hiddenSpan.offsetWidth+"px";
+      }
+      function validateInt(field,max){
+        var s = field.value;
+        if (s.length>0){
+          s = s.replaceAll(/\D/g,"");
+          if (s.length>0){
+            if (s.length>15){
+              s = s.substring(0,15);
+            }
+            s = parseInt(s);
+            s = Math.min(s,max);
+            field.value = s.toString();
+          }else{
+            field.value = "";
+          }
+        }
+      }
+      function validateDouble(field,max){
+        var s = field.value;
+        if (s.length>0){
+          const dot = s.indexOf('.');
+          if (dot==-1){
+            s = s.replaceAll(/\D/g,"");
+            if (s.length>0){
+              if (s.length>15){
+                s = s.substring(0,15);
+              }
+              s = parseInt(s);
+              s = Math.min(s,max);
+              field.value = s.toString();
+            }else{
+              field.value = "";
+            }
+          }else{
+            let a = s.substring(0,dot).replaceAll(/\D/g,"");
+            if (a.length==0){
+              a = "0";
+            }else if (a.length>15){
+              a = a.substring(0,15);
+            }
+            let b = s.substring(dot+1).replaceAll(/\D/g,"");
+            if (b.length==0){
+              a = parseInt(a);
+              a = Math.min(a,max);
+              field.value = a.toString()+".";
+            }else{
+              if (b.length>2){
+                b = b.charAt(0)+b.charAt(b.length-1);
+              }
+              s = parseFloat(a+"."+b);
+              s = Math.min(s,max);
+              field.value = s.toFixed(b.length);
+            }
+          }
+        }
+      }
+      function toDate(epochSeconds){
+        if (epochSeconds==0){
+          return "None";
+        }
+        const d = new Date(1000*epochSeconds);
+        return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+" - "+pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds());
+      }
+      function pad(x){
+        if (x>9){
+          return String(x);
+        }else{
+          return "0"+String(x);
+        }
+      }
+      function setStatus(color,text){
+        statusBox.innerText = text;
+        statusBox.style.color = color;
+      }
+      function disableChanges(){
+        changeAllowed = false;
+        saveButton.disabled = true;
+        discardButton.disabled = true;
+        resetButton.disabled = true;
+        triggerButton.disabled = true;
+        capDirField.disabled = true;
+        emailSubjectField.disabled = true;
+        emailRecipientsField.disabled = true;
+        for (const i of document.getElementById("alarm_body").getElementsByTagName("INPUT")){
+          i.disabled = true;
+        }
+      }
+      function enableChanges(){
+        changeAllowed = true;
+        saveButton.disabled = false;
+        discardButton.disabled = false;
+        resetButton.disabled = false;
+        triggerButton.disabled = false;
+        capDirField.disabled = false;
+        emailSubjectField.disabled = false;
+        emailRecipientsField.disabled = false;
+        for (const i of document.getElementById("alarm_body").getElementsByTagName("INPUT")){
+          i.disabled = false;
+        }
+      }
+      function save(){
+        if (!changeAllowed){
+          return;
+        }
+        if (!changes){
+          setStatus("lightgreen","No updates were made.");
+          return;
+        }
+        disableChanges();
+        for (const i of document.getElementById("alarm_body").getElementsByTagName("INPUT")){
+          if (i.getAttribute("type")=="text" && i.value.length==0){
+            setStatus("red","Please populate all alarm parameters before saving data.");
+            enableChanges();
+            return;
+          }
+        }
+        const req = new XMLHttpRequest();
+        req.open("POST","__PREFIX__/index?type=save");
+        req.setRequestHeader("content-type", "application/x-www-form-urlencoded");
+        req.timeout = 10000;
+        req.onreadystatechange = function(){
+          if (this.readyState===4){
+            if (this.status===200){
+              setStatus("lightgreen","Successful.");
+              unregisterChange();
+            }else if (this.status==0){
+              setStatus("red","Request timed out.");
+            }else{
+              setStatus("red","HTTP Error "+this.status);
+            }
+            enableChanges();
+          }
+        };
+        setStatus("lightgreen","Saving data...");
+        req.send(
+          "capDir="+encodeURIComponent(capDirField.value)+
+          "&emailSubject="+encodeURIComponent(emailSubjectField.value)+
+          "&emailRecipients="+encodeURIComponent(emailRecipientsField.value)+
+          "&fdru="+encodeURIComponent(param_fdru.value)+
+          "&eot="+encodeURIComponent(param_eot.value)+
+          "&ias="+encodeURIComponent(param_ias.value)+
+          "&wis="+encodeURIComponent(param_wis.value)+
+          "&uwi="+encodeURIComponent(param_uwi.value)+
+          "&din="+encodeURIComponent(param_din.value)+
+          "&iad="+encodeURIComponent(param_iad.value)+
+          "&iasl="+encodeURIComponent(param_iasl.value)+
+          "&iars="+encodeURIComponent(param_iars.value)+
+          "&wirs="+encodeURIComponent(param_wirs.value)+
+          "&uwir="+encodeURIComponent(param_uwir.value)+
+          "&dnn="+encodeURIComponent(param_dnn.value)+
+          "&ihs="+encodeURIComponent(param_ihs.value)+
+          "&whs="+encodeURIComponent(param_whs.value)+
+          "&uwh="+encodeURIComponent(param_uwh.value)+
+          "&ucs="+encodeURIComponent(param_ucs.value)+
+          "&_fdru="+encodeURIComponent(not_fdru.checked)+
+          "&_eot="+encodeURIComponent(not_eot.checked)+
+          "&_rbtn="+encodeURIComponent(not_rbtn.checked)+
+          "&_ias="+encodeURIComponent(not_ias.checked)+
+          "&_wis="+encodeURIComponent(not_wis.checked)+
+          "&_uwi="+encodeURIComponent(not_uwi.checked)+
+          "&_din="+encodeURIComponent(not_din.checked)+
+          "&_iad="+encodeURIComponent(not_iad.checked)+
+          "&_iasl="+encodeURIComponent(not_iasl.checked)+
+          "&_iars="+encodeURIComponent(not_iars.checked)+
+          "&_wirs="+encodeURIComponent(not_wirs.checked)+
+          "&_uwir="+encodeURIComponent(not_uwir.checked)+
+          "&_dnn="+encodeURIComponent(not_dnn.checked)+
+          "&_ihs="+encodeURIComponent(not_ihs.checked)+
+          "&_whs="+encodeURIComponent(not_whs.checked)+
+          "&_uwh="+encodeURIComponent(not_uwh.checked)+
+          "&_ucs="+encodeURIComponent(not_ucs.checked)
+        );
+      }
+      function refresh(){
+        if (!changeAllowed){
+          return;
+        }
+        disableChanges();
+        const req = new XMLHttpRequest();
+        req.open("POST","__PREFIX__/index?type=refresh");
+        req.setRequestHeader("content-type", "application/x-www-form-urlencoded");
+        req.timeout = 10000;
+        req.onreadystatechange = function(){
+          if (this.readyState===4){
+            if (this.status===200){
+              parseRefresh(this.responseText);
+            }else if (this.status==0){
+              setStatus("red","Request timed out.");
+            }else{
+              setStatus("red","HTTP Error "+this.status);
+            }
+            enableChanges();
+          }
+        };
+        setStatus("lightgreen","Refreshing...");
+        req.send();
+      }
+      function parseRefresh(s){
+        try{
+          const data = JSON.parse(s);
+          capDirField.value = data["capDir"];
+          emailSubjectField.value = data["emailSubject"];
+          emailRecipientsField.value = data["emailRecipients"];
+          const x = data["firstCheck"];
+          const y = data["lastCheck"];
+          firstCheckBox.innerText = toDate(x);
+          lastCheckBox.innerText = toDate(y);
+          timespanBox.innerText = ((y-x)/3600.0).toFixed(2)+" hrs";
+          alarmCountBox.innerText = data["alarmCount"];
+          ramBox.innerText = data["ram"];
+          param_fdru.value = data["fdru"];
+          param_eot.value = data["eot"];
+          param_ias.value = data["ias"];
+          param_wis.value = data["wis"];
+          param_uwi.value = data["uwi"];
+          param_din.value = data["din"];
+          param_iad.value = data["iad"];
+          param_iasl.value = data["iasl"];
+          param_iars.value = data["iars"];
+          param_wirs.value = data["wirs"];
+          param_uwir.value = data["uwir"];
+          param_dnn.value = data["dnn"];
+          param_ihs.value = data["ihs"];
+          param_whs.value = data["whs"];
+          param_uwh.value = data["uwh"];
+          param_ucs.value = data["ucs"];
+          not_fdru.checked = data["_fdru"];
+          not_eot.checked = data["_eot"];
+          not_rbtn.checked = data["_rbtn"];
+          not_ias.checked = data["_ias"];
+          not_wis.checked = data["_wis"];
+          not_uwi.checked = data["_uwi"];
+          not_din.checked = data["_din"];
+          not_iad.checked = data["_iad"];
+          not_iasl.checked = data["_iasl"];
+          not_iars.checked = data["_iars"];
+          not_wirs.checked = data["_wirs"];
+          not_uwir.checked = data["_uwir"];
+          not_dnn.checked = data["_dnn"];
+          not_ihs.checked = data["_ihs"];
+          not_whs.checked = data["_whs"];
+          not_uwh.checked = data["_uwh"];
+          not_ucs.checked = data["_ucs"];
+          pps_ucov.innerText = data["pps_ucov"];
+          pps_wi.innerText = data["pps_wi"];
+          pps_ia.innerText = data["pps_ia"];
+          pps_wh.innerText = data["pps_wh"];
+          pps_ih.innerText = data["pps_ih"];
+          pps_wir.innerText = data["pps_wir"];
+          pps_iar.innerText = data["pps_iar"];
+          pps_o.innerText = data["pps_o"];
+          pps_tot.innerText = data["pps_tot"];
+          spp_ucov.innerText = data["spp_ucov"];
+          spp_wi.innerText = data["spp_wi"];
+          spp_ia.innerText = data["spp_ia"];
+          spp_wh.innerText = data["spp_wh"];
+          spp_ih.innerText = data["spp_ih"];
+          spp_wir.innerText = data["spp_wir"];
+          spp_iar.innerText = data["spp_iar"];
+          spp_o.innerText = data["spp_o"];
+          spp_tot.innerText = data["spp_tot"];
+          rel_ucov.innerText = data["rel_ucov"];
+          rel_wi.innerText = data["rel_wi"];
+          rel_ia.innerText = data["rel_ia"];
+          rel_wh.innerText = data["rel_wh"];
+          rel_ih.innerText = data["rel_ih"];
+          rel_wir.innerText = data["rel_wir"];
+          rel_iar.innerText = data["rel_iar"];
+          rel_o.innerText = data["rel_o"];
+          resize(capDirField);
+          resize(emailSubjectField);
+          resize(emailRecipientsField);
+          for (const tr of document.getElementById("alarm_body").getElementsByTagName("TR")){
+            if (tr._update){
+              tr._update();
+            }
+          }
+          setStatus("lightgreen","Successful.");
+          unregisterChange();
+        }catch(e){
+          console.error(e);
+          setStatus("red","Invalid Response");
+        }
+      }
+      function reset(){
+        param_fdru.value = __fdru_DEFAULT__;
+        param_eot.value = __eot_DEFAULT__;
+        param_ias.value = __ias_DEFAULT__;
+        param_wis.value = __wis_DEFAULT__;
+        param_uwi.value = __uwi_DEFAULT__;
+        param_din.value = __din_DEFAULT__;
+        param_iad.value = __iad_DEFAULT__;
+        param_iasl.value = __iasl_DEFAULT__;
+        param_iars.value = __iars_DEFAULT__;
+        param_wirs.value = __wirs_DEFAULT__;
+        param_uwir.value = __uwir_DEFAULT__;
+        param_dnn.value = __dnn_DEFAULT__;
+        param_ihs.value = __ihs_DEFAULT__;
+        param_whs.value = __whs_DEFAULT__;
+        param_uwh.value = __uwh_DEFAULT__;
+        param_ucs.value = __ucs_DEFAULT__;
+        registerChange();
+        for (const tr of document.getElementById("alarm_body").getElementsByTagName("TR")){
+          if (tr._update){
+            tr._update();
+          }
+        }
+      }
+      function trigger(){
+        if (!changeAllowed){
+          return;
+        }
+        disableChanges();
+        const req = new XMLHttpRequest();
+        req.open("POST","__PREFIX__/index?type=trigger");
+        req.setRequestHeader("content-type", "application/x-www-form-urlencoded");
+        req.timeout = 10000;
+        req.onreadystatechange = function(){
+          if (this.readyState===4){
+            if (this.status===200){
+              setStatus("lightgreen","Analysis triggered.");
+            }else if (this.status==0){
+              setStatus("red","Request timed out.");
+            }else{
+              setStatus("red","HTTP Error "+this.status);
+            }
+            enableChanges();
+          }
+        };
+        setStatus("lightgreen","Submitting...");
+        req.send();
+      }
+    </script>
+  </head>
+  <body>
+    <div style="text-align:center">
+      <h1 id="mainTitle">Wireshark Analyzer</h1>
+      <div style="position:sticky;top:0;width:100%;background-color:black;padding-top:0.75em;border-bottom:1px solid gray;border-top:1px solid gray">
+        <div>
+          <a class="e" href="__PREFIX__/stats">Statistics</a>
+          <a class="e" href="__PREFIX__/alarms">Alarms</a>
+          <a class="e" href="__PREFIX__/index?type=download" target="_blank" download="data.pcap">Download Packets</a>
+          <a class="e" href="__DOCUMENTATION__" target="_blank">Documentation</a>
+        </div>
+        <div style="padding-top:0.5em">
+          <button class="e" id="saveButton" onclick="save()">Save Changes</button>
+          <button class="e" id="discardButton" onclick="refresh()">Discard Changes</button>
+          <button class="e" id="resetButton" onclick="reset()" title="Revert all alarming parameters to default values.">Revert to Defaults</button>
+          <button class="e" id="triggerButton" onclick="trigger()">Analyze Now</button>
+        </div>
+        <div class="divGrouping">
+          <label for="statusBox">Status:</label>
+          <span id="statusBox">Refreshing...</span>
+        </div>
+      </div>
+      <br>
+      <div class="row">
+        <div class="column">
+          <table style="float:right;margin-right:1em">
+            <thead>
+              <tr>
+                <th>
+                  Configuration
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td title="Filepath to the continuous packet capture directory on the WebCTRL server.">
+                  <label for="capDirField">Packet Capture Directory:</label>
+                  <input class="c" type="text" id="capDirField" oninput="resize(this);registerChange()">
+                </td>
+              </tr>
+              <tr>
+                <td title="Specifies the email subject for alarm notifications. Leave this blank to disable notifications.">
+                  <label for="emailSubjectField">Email Subject:</label>
+                  <input class="c" type="text" id="emailSubjectField" oninput="resize(this);registerChange()">
+                </td>
+              </tr>
+              <tr>
+                <td title="Semi-colon delimited list of recipient email addresses for alarm notifications. Leave this blank to disable notifications.">
+                  <label for="emailRecipientsField">Email Recipients:</label>
+                  <input class="c" type="text" id="emailRecipientsField" oninput="resize(this);registerChange()">
+                </td>
+              </tr>
+              <tr>
+                <td title="The timestamp recorded with the first packet analyzed.">
+                  <label for="firstCheckBox">First Packet:</label>
+                  <span id="firstCheckBox"></span>
+                </td>
+              </tr>
+              <tr>
+                <td title="The timestamp recorded with the last packet analyzed.">
+                  <label for="lastCheckBox">Last Packet:</label>
+                  <span id="lastCheckBox"></span>
+                </td>
+              </tr>
+              <tr>
+                <td title="The amount of time between the first and last analyzed packet.">
+                  <label for="timespanBox">Timespan:</label>
+                  <span id="timespanBox"></span>
+                </td>
+              </tr>
+              <tr>
+                <td title="The number of queued alarms.">
+                  <label for="alarmCountBox">Alarm Count:</label>
+                  <span id="alarmCountBox"></span>
+                </td>
+              </tr>
+              <tr>
+                <td title="An estimate of the amount of RAM used by this add-on.">
+                  <label for="ramBox">RAM:</label>
+                  <span id="ramBox"></span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="column">
+          <table style="float:left;margin-left:1em">
+            <thead>
+              <tr><th>Broadcast Type</th><th>Packets / Second</th><th>Seconds / Packet</th><th>Relative %</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Unconfirmed-COV</td><td id="pps_ucov"></td><td id="spp_ucov"></td><td id="rel_ucov"></td></tr>
+              <tr><td>Who-Is</td><td id="pps_wi"></td><td id="spp_wi"></td><td id="rel_wi"></td></tr>
+              <tr><td>I-Am</td><td id="pps_ia"></td><td id="spp_ia"></td><td id="rel_ia"></td></tr>
+              <tr><td>Who-Has</td><td id="pps_wh"></td><td id="spp_wh"></td><td id="rel_wh"></td></tr>
+              <tr><td>I-Have</td><td id="pps_ih"></td><td id="spp_ih"></td><td id="rel_ih"></td></tr>
+              <tr><td>Who-Is-Router</td><td id="pps_wir"></td><td id="spp_wir"></td><td id="rel_wir"></td></tr>
+              <tr><td>I-Am-Router</td><td id="pps_iar"></td><td id="spp_iar"></td><td id="rel_iar"></td></tr>
+              <tr><td>Other</td><td id="pps_o"></td><td id="spp_o"></td><td id="rel_o"></td></tr>
+              <tr><td>Total</td><td id="pps_tot"></td><td id="spp_tot"></td><td>100%</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <br>
+      <table>
+        <thead>
+          <tr><th>Notify</th><th>Alarm</th><th>Parameter</th><th>Description</th></tr>
+        </thead>
+        <tbody id="alarm_body">
+          <tr id="tr_fdru">
+            <td id="not_td_fdru"><input type="checkbox" id="not_fdru"></td>
+            <td>FDR<br>Unnecessary</td>
+            <td>
+              <label for="param_fdru">Maximum<br>Response Time</label><br>
+              <input class="c" type="text" id="param_fdru">
+              <span>ms</span>
+            </td>
+            <td id="desc_fdru"></td>
+          </tr>
+          <tr id="tr_eot">
+            <td id="not_td_eot"><input type="checkbox" id="not_eot"></td>
+            <td>Excess<br>Other<br>Traffic</td>
+            <td>
+              <label for="param_eot">Max. Percentage</label><br>
+              <input class="c" type="text" id="param_eot">
+              <span>%</span>
+            </td>
+            <td id="desc_eot"></td>
+          </tr>
+          <tr id="tr_rbtn">
+            <td id="not_td_rbtn"><input type="checkbox" id="not_rbtn"></td>
+            <td>Router<br>Busy To<br>Network</td>
+            <td></td>
+            <td id="desc_rbtn"></td>
+          </tr>
+          <tr id="tr_ias">
+            <td id="not_td_ias"><input type="checkbox" id="not_ias"></td>
+            <td>I-Am<br>Spam</td>
+            <td>
+              <label for="param_ias">Interval</label><br>
+              <input class="c" type="text" id="param_ias">
+              <span>secs</span>
+            </td>
+            <td id="desc_ias"></td>
+          </tr>
+          <tr id="tr_wis">
+            <td id="not_td_wis"><input type="checkbox" id="not_wis"></td>
+            <td>Who-Is<br>Spam</td>
+            <td>
+              <label for="param_wis">Interval</label><br>
+              <input class="c" type="text" id="param_wis">
+              <span>secs</span>
+            </td>
+            <td id="desc_wis"></td>
+          </tr>
+          <tr id="tr_uwi">
+            <td id="not_td_uwi"><input type="checkbox" id="not_uwi"></td>
+            <td>Unanswered<br>Who-Is</td>
+            <td>
+              <label for="param_uwi">Interval</label><br>
+              <input class="c" type="text" id="param_uwi">
+              <span>secs</span>
+            </td>
+            <td id="desc_uwi"></td>
+          </tr>
+          <tr id="tr_din">
+            <td id="not_td_din"><input type="checkbox" id="not_din"></td>
+            <td>Duplicate<br>Instance<br>Number</td>
+            <td>
+              <label for="param_din">Interval</label><br>
+              <input class="c" type="text" id="param_din">
+              <span>secs</span>
+            </td>
+            <td id="desc_din"></td>
+          </tr>
+          <tr id="tr_iad">
+            <td id="not_td_iad"><input type="checkbox" id="not_iad"></td>
+            <td>I-Am<br>Doubling</td>
+            <td>
+              <label for="param_iad">Threshold</label><br>
+              <input class="c" type="text" id="param_iad">
+            </td>
+            <td id="desc_iad"></td>
+          </tr>
+          <tr id="tr_iasl">
+            <td id="not_td_iasl"><input type="checkbox" id="not_iasl"></td>
+            <td>I-Am<br>Slow</td>
+            <td>
+              <label for="param_iasl">Response Time</label><br>
+              <input class="c" type="text" id="param_iasl">
+              <span>ms</span>
+            </td>
+            <td id="desc_iasl"></td>
+          </tr>
+          <tr id="tr_iars">
+            <td id="not_td_iars"><input type="checkbox" id="not_iars"></td>
+            <td>I-Am-Router<br>Spam</td>
+            <td>
+              <label for="param_iars">Interval</label><br>
+              <input class="c" type="text" id="param_iars">
+              <span>secs</span>
+            </td>
+            <td id="desc_iars"></td>
+          </tr>
+          <tr id="tr_wirs">
+            <td id="not_td_wirs"><input type="checkbox" id="not_wirs"></td>
+            <td>Who-Is-Router<br>Spam</td>
+            <td>
+              <label for="param_wirs">Interval</label><br>
+              <input class="c" type="text" id="param_wirs">
+              <span>secs</span>
+            </td>
+            <td id="desc_wirs"></td>
+          </tr>
+          <tr id="tr_uwir">
+            <td id="not_td_uwir"><input type="checkbox" id="not_uwir"></td>
+            <td>Unanswered<br>Who-Is-Router</td>
+            <td>
+              <label for="param_uwir">Interval</label><br>
+              <input class="c" type="text" id="param_uwir">
+              <span>secs</span>
+            </td>
+            <td id="desc_uwir"></td>
+          </tr>
+          <tr id="tr_dnn">
+            <td id="not_td_dnn"><input type="checkbox" id="not_dnn"></td>
+            <td>Duplicate<br>Network<br>Number</td>
+            <td>
+              <label for="param_dnn">Interval</label><br>
+              <input class="c" type="text" id="param_dnn">
+              <span>secs</span>
+            </td>
+            <td id="desc_dnn"></td>
+          </tr>
+          <tr id="tr_ihs">
+            <td id="not_td_ihs"><input type="checkbox" id="not_ihs"></td>
+            <td>I-Have<br>Spam</td>
+            <td>
+              <label for="param_ihs">Interval</label><br>
+              <input class="c" type="text" id="param_ihs">
+              <span>secs</span>
+            </td>
+            <td id="desc_ihs"></td>
+          </tr>
+          <tr id="tr_whs">
+            <td id="not_td_whs"><input type="checkbox" id="not_whs"></td>
+            <td>Who-Has<br>Spam</td>
+            <td>
+              <label for="param_whs">Interval</label><br>
+              <input class="c" type="text" id="param_whs">
+              <span>secs</span>
+            </td>
+            <td id="desc_whs"></td>
+          </tr>
+          <tr id="tr_uwh">
+            <td id="not_td_uwh"><input type="checkbox" id="not_uwh"></td>
+            <td>Unanswered<br>Who-Has</td>
+            <td>
+              <label for="param_uwh">Interval</label><br>
+              <input class="c" type="text" id="param_uwh">
+              <span>secs</span>
+            </td>
+            <td id="desc_uwh"></td>
+          </tr>
+          <tr id="tr_ucs">
+            <td id="not_td_ucs"><input type="checkbox" id="not_ucs"></td>
+            <td>Unconfirmed<br>COV Spam</td>
+            <td>
+              <label for="param_ucs">Interval</label><br>
+              <input class="c" type="text" id="param_ucs">
+              <span>secs</span>
+            </td>
+            <td id="desc_ucs"></td>
+          </tr>
+        </tbody>
+      </table>
+      <span id="hiddenSpan" style="min-width:2.5em;color:black;display:inline-block;position:absolute;left:-100000px;white-space:pre"></span>
+    </div>
+    <script>
+      var changes;
+      var changeAllowed = true;
+      var prompt = true;
+      resize(capDirField);
+      resize(emailSubjectField);
+      resize(emailRecipientsField);
+      const f = (s,max,t,double)=>{
+        const x = document.getElementById("not_"+s);
+        x.oninput = ()=>{
+          registerChange();
+        };
+        x.onclick = (e)=>{
+          if (e.ctrlKey && changeAllowed){
+            registerChange();
+            for (const i of document.getElementById("alarm_body").getElementsByTagName("INPUT")){
+              if (i.getAttribute("type")=="checkbox"){
+                i.checked = x.checked;
+              }
+            }
+          }
+        }
+        x.style.width = "1.3em";
+        x.style.height = "1.3em";
+        x.style.verticalAlign = "middle";
+        const ntd = document.getElementById("not_td_"+s);
+        ntd.onclick = (e)=>{
+          if (e.target===x || !changeAllowed){ return; }
+          x.checked = !x.checked;
+          registerChange();
+          x.onclick(e);
+        };
+        ntd.setAttribute("title","Controls whether email notifications are sent out when an alarm is triggered.\n'CTRL+Left Click' to select or deselect all checkboxes at once.");
+        const z = document.getElementById("desc_"+s);
+        z.style.textAlign = "left";
+        if (max===null){
+          z.innerText = t;
+        }else{
+          const w = document.getElementById("tr_"+s);
+          const y = document.getElementById("param_"+s);
+          y.style.marginTop = "0.5em";
+          w._update = ()=>{
+            resize(y);
+            z.innerText = t.replaceAll("#",y.value.length==0?"???":y.value);
+          };
+          y.oninput = ()=>{
+            if (double){
+              validateDouble(y,max);
+            }else{
+              validateInt(y,max);
+            }
+            w._update();
+            registerChange();
+          };
+          w._update();
+        }
+      };
+      f("fdru",60000,"This alarm is triggered when foreign device registration (FDR) is configured on a BACnet/IP connection and one of the following conditions are met:\n- An ALC router is detected in the same subnet as the WebCTRL server.\n- The number of singular Who-Is packets with multiple response I-Am packets exceeds the number of singular Who-Is packets with one response.\n\nWho-Is packets are considered to be singular when they target exactly one device instance number.\nI-Am responses must occur within # milliseconds of the Who-Is packet in order to be considered a response.\nThe maximum response time specified here impacts other alarms as well.");
+      f("eot",100,"This alarm is triggered when more than #% of broadcast traffic is unrecognized and falls into the 'other' category.");
+      f("rbtn",null,"This alarm is triggered when any Router-Busy-To-Network packets are detected.\nOne alarm is triggered for each source.");
+      f("ias",36000,"This alarm is triggered when more than one unprompted I-Am packet is sent every # seconds for a single device instance.");
+      f("wis",36000,"This alarm is triggered when more than one answered Who-Is packet with identical low and high limits is sent every # seconds.")
+      f("uwi",36000,"This alarm is triggered when more than one unanswered Who-Is packet with identical low and high limits is sent every # seconds.");
+      f("din",36000,"This alarm is triggered when two or more I-Am packets for the same instance number have different sources and occur within # seconds of each other.");
+      f("iad",4,"This alarm is triggered when the average number of prompted I-Am responses per Who-Is packet for a given instance number exceeds #.\nThe 'FDR Unnecessary' and 'Duplicate Instance Number' alarms must be inactive for this alarm to activate.\nThis alarm may indicate a duplicate device instance under the same BACnet/IP router, or it may indicate BBMD problems.",true);
+      f("iasl",60000,"This alarm is triggered when the average I-Am response time to Who-Is packets for a specific device instance is greater than # milliseconds.\nPlease take care to ensure # is less than the maximum response time parameter specified in the 'FDR Unnecessary' alarm.");
+      f("iars",36000,"This alarm is triggered when more than one unprompted I-Am-Router packet is sent every # seconds for a single network number.");
+      f("wirs",36000,"This alarm is triggered when more than one answered Who-Is-Router packet for the same network number is sent every # seconds.")
+      f("uwir",36000,"This alarm is triggered when more than one unanswered Who-Is-Router packet for the same network number is sent every # seconds.");
+      f("dnn",36000,"This alarm is triggered when two or more I-Am-Network packets for the same network number have different sources and occur within # seconds of each other.");
+      f("ihs",36000,"This alarm is triggered when more than one unprompted I-Have packet is sent every # seconds for a single object.");
+      f("whs",36000,"This alarm is triggered when more than one answered Who-Has packet for the same object is sent every # seconds.");
+      f("uwh",36000,"This alarm is triggered when more than one unanswered Who-Has packet for the same object is sent every # seconds.");
+      f("ucs",36000,"This alarm is triggered when more than one Unconfirmed-COV-Notification packet for the same object is sent every # seconds.");
+      unregisterChange();
+      window.onbeforeunload = ()=>{
+        if (prompt && changes){
+          return "Changes remain unsaved. Are you sure you want to leave?";
+        }
+      };
+      refresh();
+    </script>
+  </body>
+</html>

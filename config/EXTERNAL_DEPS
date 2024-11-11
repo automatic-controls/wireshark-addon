@@ -1,0 +1,4 @@
+url:pkts-core-3.0.10.jar:https://repo1.maven.org/maven2/io/pkts/pkts-core/3.0.10/pkts-core-3.0.10.jar
+url:pkts-core-3.0.10-sources.jar:https://repo1.maven.org/maven2/io/pkts/pkts-core/3.0.10/pkts-core-3.0.10-sources.jar
+url:pkts-buffers-3.0.10.jar:https://repo1.maven.org/maven2/io/pkts/pkts-buffers/3.0.10/pkts-buffers-3.0.10.jar
+url:pkts-buffers-3.0.10-sources.jar:https://repo1.maven.org/maven2/io/pkts/pkts-buffers/3.0.10/pkts-buffers-3.0.10-sources.jar

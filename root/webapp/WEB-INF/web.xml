@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<web-app>
+
+  <listener>
+    <listener-class>aces.webctrl.wireshark.core.Initializer</listener-class>
+  </listener>
+
+  <welcome-file-list>
+    <welcome-file>index</welcome-file>
+  </welcome-file-list>
+
+  <servlet>
+    <servlet-name>MainPage</servlet-name>
+    <servlet-class>aces.webctrl.wireshark.web.MainPage</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>MainPage</servlet-name>
+    <url-pattern>/index</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
+    <servlet-name>AlarmPage</servlet-name>
+    <servlet-class>aces.webctrl.wireshark.web.AlarmPage</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>AlarmPage</servlet-name>
+    <url-pattern>/alarms</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
+    <servlet-name>StatPage</servlet-name>
+    <servlet-class>aces.webctrl.wireshark.web.StatPage</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>StatPage</servlet-name>
+    <url-pattern>/stats</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
+    <servlet-name>ViewerPage</servlet-name>
+    <servlet-class>aces.webctrl.wireshark.web.ViewerPage</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>ViewerPage</servlet-name>
+    <url-pattern>/viewer</url-pattern>
+  </servlet-mapping>
+
+  <security-constraint>
+    <web-resource-collection>
+      <web-resource-name>WEB</web-resource-name>
+      <url-pattern>/*</url-pattern>
+    </web-resource-collection>
+  </security-constraint>
+
+  <filter>
+    <filter-name>RoleFilterAJAX</filter-name>
+    <filter-class>com.controlj.green.addonsupport.web.RoleFilter</filter-class>
+    <init-param>
+      <param-name>roles</param-name>
+      <param-value>view_administrator_only</param-value>
+    </init-param>
+  </filter>
+  <filter-mapping>
+    <filter-name>RoleFilterAJAX</filter-name>
+    <url-pattern>/*</url-pattern>
+  </filter-mapping>
+
+</web-app>

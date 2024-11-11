@@ -1,0 +1,36 @@
+JDK Version:
+openjdk 22.0.1 2024-04-16
+OpenJDK Runtime Environment (build 22.0.1+8-16)
+OpenJDK 64-Bit Server VM (build 22.0.1+8-16, mixed mode, sharing)
+
+Compilation Flags:
+--release 11
+
+Runtime Dependencies:
+addonsupport-api-addon-1.10.0
+alarmmanager-api-addon-1.10.0
+bacnet-api-core-1.10.007-20240227.1003r
+directaccess-api-addon-1.10.0
+tomcat-embed-core-9.0.87
+webaccess-api-addon-1.10.0
+xdatabase-api-addon-1.10.0
+commbacnet-1.10.007-20240227.1003r
+commbase-1.7.013-20221207.1258r
+common-9.0.002
+commonbaseutils-2.0.5
+commonexceptions-9.0.002
+core-9.0.002
+core-api-9.0.002
+datatable-9.0.002
+directaccess-9.0.002
+directaccess-api-9.0.002
+extensionsupport-api-9.0.002
+serviceframework-9.0.002
+spring-context-5.3.33
+webserver-api-9.0.002
+
+Packaged Dependencies:
+pkts-buffers-3.0.10-sources
+pkts-buffers-3.0.10
+pkts-core-3.0.10-sources
+pkts-core-3.0.10

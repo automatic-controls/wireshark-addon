@@ -1,0 +1,431 @@
+<!--
+  BSD 3-Clause License
+  Copyright (c) 2024, Automatic Controls Equipment Systems, Inc.
+  Contributors: Cameron Vogt (@cvogt729)
+-->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>
+      Wireshark Analyzer
+    </title>
+    <link rel="stylesheet" type="text/css" href="../../../../../root/webapp/main.css"/>
+    <script>
+      function toDate(epochSeconds){
+        if (epochSeconds==0){
+          return "?";
+        }
+        const d = new Date(1000*epochSeconds);
+        return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+" - "+pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds());
+      }
+      function pad(x){
+        if (x>9){
+          return String(x);
+        }else{
+          return "0"+String(x);
+        }
+      }
+      function setStatus(color,text){
+        statusBox.innerText = text;
+        statusBox.style.color = color;
+      }
+      function disableChanges(){
+        changeAllowed = false;
+        refreshButton.disabled = true;
+        for (const i of document.getElementById("type_body").getElementsByTagName("INPUT")){
+          i.disabled = true;
+        }
+      }
+      function enableChanges(){
+        changeAllowed = true;
+        refreshButton.disabled = false;
+        for (const i of document.getElementById("type_body").getElementsByTagName("INPUT")){
+          i.disabled = false;
+        }
+      }
+      function refresh(){
+        if (!changeAllowed){
+          return;
+        }
+        disableChanges();
+        const req = new XMLHttpRequest();
+        req.open("POST","__PREFIX__/stats?type=refresh");
+        req.setRequestHeader("content-type", "application/x-www-form-urlencoded");
+        req.timeout = 10000;
+        req.onreadystatechange = function(){
+          if (this.readyState===4){
+            if (this.status===200){
+              parseRefresh(this.responseText);
+            }else if (this.status==0){
+              setStatus("red","Request timed out.");
+            }else{
+              setStatus("red","HTTP Error "+this.status);
+            }
+            enableChanges();
+          }
+        };
+        setStatus("lightgreen","Refreshing...");
+        req.send();
+      }
+      function parseRefresh(s){
+        try{
+          const data = JSON.parse(s);
+          lines = data["lines"];
+          const latest = data["latest"];
+          pps_ucov.innerText = latest["pps_ucov"];
+          pps_wi.innerText = latest["pps_wi"];
+          pps_ia.innerText = latest["pps_ia"];
+          pps_wh.innerText = latest["pps_wh"];
+          pps_ih.innerText = latest["pps_ih"];
+          pps_wir.innerText = latest["pps_wir"];
+          pps_iar.innerText = latest["pps_iar"];
+          pps_o.innerText = latest["pps_o"];
+          pps_tot.innerText = latest["pps_tot"];
+          spp_ucov.innerText = latest["spp_ucov"];
+          spp_wi.innerText = latest["spp_wi"];
+          spp_ia.innerText = latest["spp_ia"];
+          spp_wh.innerText = latest["spp_wh"];
+          spp_ih.innerText = latest["spp_ih"];
+          spp_wir.innerText = latest["spp_wir"];
+          spp_iar.innerText = latest["spp_iar"];
+          spp_o.innerText = latest["spp_o"];
+          spp_tot.innerText = latest["spp_tot"];
+          rel_ucov.innerText = latest["rel_ucov"];
+          rel_wi.innerText = latest["rel_wi"];
+          rel_ia.innerText = latest["rel_ia"];
+          rel_wh.innerText = latest["rel_wh"];
+          rel_ih.innerText = latest["rel_ih"];
+          rel_wir.innerText = latest["rel_wir"];
+          rel_iar.innerText = latest["rel_iar"];
+          rel_o.innerText = latest["rel_o"];
+          draw();
+          setStatus("lightgreen","Success.");
+        }catch(e){
+          console.error(e);
+          setStatus("red","Invalid Response");
+        }
+      }
+      function draw(){
+        const arr = [
+          "ucov",
+          "wi",
+          "ia",
+          "wh",
+          "ih",
+          "wir",
+          "iar",
+          "o",
+          "tot"
+        ];
+        const fullNames = {
+          "ucov":"Unconfirmed-COV",
+          "wi":"Who-Is",
+          "ia":"I-Am",
+          "wh":"Who-Has",
+          "ih":"I-Have",
+          "wir":"Who-Is-Router",
+          "iar":"I-Am-Router",
+          "o":"Other",
+          "tot":"Total"
+        };
+        const colors = {
+          "ucov":"#0000FF",//blue
+          "wi":"#FF0000",//red
+          "ia":"#FFBF00",//orange
+          "wh":"#008000",//green
+          "ih":"#800080",//purple
+          "wir":"#FF00FF",//pink
+          "iar":"#00FFFF",//aqua
+          "o":"#00FF00",//lime
+          "tot":"#C0C0C0"//silver
+        };
+        const v = {
+          "ucov":document.getElementById("cb_ucov").checked,
+          "wi":document.getElementById("cb_wi").checked,
+          "ia":document.getElementById("cb_ia").checked,
+          "wh":document.getElementById("cb_wh").checked,
+          "ih":document.getElementById("cb_ih").checked,
+          "wir":document.getElementById("cb_wir").checked,
+          "iar":document.getElementById("cb_iar").checked,
+          "o":document.getElementById("cb_o").checked,
+          "tot":document.getElementById("cb_tot").checked
+        };
+        document.getElementById("td_ucov").style.backgroundColor = v["ucov"]?colors["ucov"]:"#000000";
+        document.getElementById("td_wi").style.backgroundColor = v["wi"]?colors["wi"]:"#000000";
+        document.getElementById("td_ia").style.backgroundColor = v["ia"]?colors["ia"]:"#000000";
+        document.getElementById("td_wh").style.backgroundColor = v["wh"]?colors["wh"]:"#000000";
+        document.getElementById("td_ih").style.backgroundColor = v["ih"]?colors["ih"]:"#000000";
+        document.getElementById("td_wir").style.backgroundColor = v["wir"]?colors["wir"]:"#000000";
+        document.getElementById("td_iar").style.backgroundColor = v["iar"]?colors["iar"]:"#000000";
+        document.getElementById("td_o").style.backgroundColor = v["o"]?colors["o"]:"#000000";
+        document.getElementById("td_tot").style.backgroundColor = v["tot"]?colors["tot"]:"#000000";
+        if (lines==null || lines.length==0){
+          return;
+        }
+        const arr_v = arr.filter((name)=>{ return v[name]; });
+        const graph = document.getElementById("graphContainer");
+        if (arr_v.length==0){
+          graph.replaceChildren();
+          return;
+        }
+        let w = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0) * 0.9;
+        let h = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0) * 0.82;
+        w = Math.round(w);
+        h = Math.round(h);
+        if (w === 0) {
+          w = 10;
+        }
+        if (h === 0) {
+          h = 10;
+        }
+        let xMin = lines[0]["end"];
+        let xMax = lines[lines.length-1]["end"];
+        let xRange = xMax - xMin;
+        const xFn = function (x) {
+          return Math.round((x - xMin) * w / xRange);
+        };
+        const xData = [];
+        const xxData = [];
+        for (const line of lines){
+          xData.push(line["end"]);
+          xxData.push(xFn(line["end"]));
+        }
+        let yMin = 0;
+        let yMax = 0.02;
+        for (const l of lines){
+          const dur = l["end"]-l["start"];
+          for (const name of arr_v){
+            yMax = Math.max(yMax, l[name]/dur);
+          }
+        }
+        let yRange = (yMax - yMin) / 20;
+        yMin -= yRange;
+        yMax += yRange;
+        yRange = yMax - yMin;
+        const yFn = function (y) {
+          return Math.round(h - (y - yMin) * h / yRange - 1);
+        };
+        const yOrigin = yFn(0);
+        const canvas = document.createElement("CANVAS");
+        const popup = document.getElementById("popup");
+        canvas.onmouseleave = function (e) {
+          popup.style.display = "none";
+        };
+        canvas.onmousemove = function (e) {
+          const rect = canvas.getBoundingClientRect();
+          if (e.ctrlKey || e.shiftKey) {
+            let j = binarySearch(xxData, e.clientX - rect.left);
+            let y = (h - e.clientY + rect.top - 1) * yRange / h + yMin;
+            let d = 0;
+            let n = null;
+            const line = lines[j];
+            const dur = line["end"]-line["start"];
+            for (const name of arr_v){
+              const dis = Math.abs(y-line[name]/dur);
+              if (n==null || dis<d){
+                d = dis;
+                n = name;
+              }
+            }
+            y = line[n]/dur;
+            const yy = yFn(y);
+            popup.innerText = toDate(xData[j]) + "\n" + y.toFixed(3)+" packets/sec\n"+fullNames[n];
+            popup.style.left = String(Math.round(rect.left + xxData[j] - popup.offsetWidth / 2 + window.scrollX)) + "px";
+            popup.style.top = String(Math.round(rect.top + yy + window.scrollY + 16)) + "px";
+          } else {
+            popup.innerText = toDate(Math.round((e.clientX - rect.left) * xRange / w + xMin)) + "\n" + ((h - e.clientY + rect.top - 1) * yRange / h + yMin).toFixed(3)+" packets/sec";
+            popup.style.left = String(Math.round(e.clientX - popup.offsetWidth / 2 + window.scrollX)) + "px";
+            popup.style.top = String(Math.round(e.clientY + window.scrollY + 16)) + "px";
+          }
+          popup.style.display = "inline-block";
+        };
+        canvas.onmouseover = canvas.onmousemove;
+        canvas.onmouseenter = canvas.onmousemove;
+        canvas.setAttribute("width", w);
+        canvas.setAttribute("height", h);
+        canvas.style.marginLeft = "auto";
+        canvas.style.marginRight = "auto";
+        canvas.style.paddingLeft = "0";
+        canvas.style.paddingRight = "0";
+        canvas.style.display = "block";
+        canvas.style.userSelect = "none";
+        canvas.style.backgroundColor = "black";
+        canvas.style.cursor = "crosshair";
+        canvas.style.border = "1px solid steelblue";
+        const ctx = canvas.getContext("2d");
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "white";
+        ctx.beginPath();
+        ctx.moveTo(0, yOrigin);
+        ctx.lineTo(w, yOrigin);
+        ctx.stroke();
+        ctx.strokeStyle = "white";
+        {
+          let yy = 1;
+          if (yy<=yMax){
+            ctx.beginPath();
+            while (yy<=yMax){
+              const y = yFn(yy);
+              ctx.moveTo(0,y);
+              ctx.lineTo(w,y);
+              yy+=1;
+            }
+            ctx.stroke();
+          }
+        }
+        {
+          const h = new Date(xMin*1000);
+          h.setHours(0);
+          h.setMinutes(0);
+          h.setSeconds(0);
+          h.setMilliseconds(0);
+          let time = h.getTime()/1000;
+          if (time<=xMin){
+            time+=86400;
+          }
+          ctx.beginPath();
+          while (time<=xMax){
+            const x = xFn(time);
+            ctx.moveTo(x,0);
+            ctx.lineTo(x,h);
+            time+=86400;
+          }
+          ctx.stroke();
+        }
+        ctx.lineWidth = 3;
+        for (const name of arr_v){
+          ctx.strokeStyle = colors[name];
+          ctx.beginPath();
+          var lastX = 0;
+          for (var i = 0; i < xData.length; ++i) {
+            const x = xxData[i];
+            const y = yFn(lines[i][name]/(lines[i]["end"]-lines[i]["start"]));
+            if (i === 0) {
+              ctx.moveTo(x, y);
+              lastX = xData[i];
+            } else {
+              ctx.lineTo(x, y);
+              lastX = xData[i];
+            }
+          }
+          ctx.stroke();
+          ctx.fillStyle = "white";
+          ctx.beginPath();
+          for (var i = 0; i < xData.length; ++i) {
+            const x = xxData[i];
+            const y = yFn(lines[i][name]/(lines[i]["end"]-lines[i]["start"]));
+            ctx.moveTo(x, y);
+            ctx.arc(x, y, 2, 0, 2 * Math.PI);
+          }
+          ctx.fill();
+        }
+        graph.replaceChildren(canvas);
+      }
+      function binarySearch(arr, val) {
+        let start = 0;
+        let end = arr.length-1;
+        while (start<=end){
+          let mid = Math.floor((start+end)/2);
+          if (arr[mid]===val){
+            return mid;
+          }
+          if (val<arr[mid]){
+            end = mid-1;
+          }else{
+            start = mid+1;
+          }
+        }
+        if (Math.abs(arr[start]-val)<Math.abs(arr[end]-val)){
+          return start;
+        }else{
+          return end;
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="popup" style="display:none;position:absolute;cursor:default;color:yellow;pointer-events:none;"></div>
+    <div style="text-align:center">
+      <h1 id="mainTitle">Statistics</h1>
+      <div style="position:sticky;top:0;width:100%;background-color:black;padding-top:0.75em;border-bottom:1px solid gray;border-top:1px solid gray">
+        <div>
+          <a class="e" href="__PREFIX__/index">Configuration</a>
+          <a class="e" href="__PREFIX__/alarms">Alarms</a>
+          <a class="e" href="__PREFIX__/index?type=download" target="_blank" download="data.pcap">Download Packets</a>
+          <a class="e" href="__DOCUMENTATION__" target="_blank">Documentation</a>
+        </div>
+        <div style="padding-top:0.5em">
+          <button class="e" id="refreshButton" onclick="refresh()">Refresh</button>
+        </div>
+        <div class="divGrouping">
+          <label for="statusBox">Status:</label>
+          <span id="statusBox">Refreshing...</span>
+        </div>
+      </div>
+      <br>
+      <table>
+        <thead>
+          <tr><th colspan="5">Current Statistics</th></tr>
+          <tr><th>Display</th><th>Broadcast Type</th><th>Packets / Second</th><th>Seconds / Packet</th><th>Relative %</th></tr>
+        </thead>
+        <tbody id="type_body">
+          <tr><td id="td_ucov"><input type="checkbox" id="cb_ucov"></td><td>Unconfirmed-COV</td><td id="pps_ucov"></td><td id="spp_ucov"></td><td id="rel_ucov"></td></tr>
+          <tr><td id="td_wi"><input type="checkbox" id="cb_wi"></td><td>Who-Is</td><td id="pps_wi"></td><td id="spp_wi"></td><td id="rel_wi"></td></tr>
+          <tr><td id="td_ia"><input type="checkbox" id="cb_ia"></td><td>I-Am</td><td id="pps_ia"></td><td id="spp_ia"></td><td id="rel_ia"></td></tr>
+          <tr><td id="td_wh"><input type="checkbox" id="cb_wh"></td><td>Who-Has</td><td id="pps_wh"></td><td id="spp_wh"></td><td id="rel_wh"></td></tr>
+          <tr><td id="td_ih"><input type="checkbox" id="cb_ih"></td><td>I-Have</td><td id="pps_ih"></td><td id="spp_ih"></td><td id="rel_ih"></td></tr>
+          <tr><td id="td_wir"><input type="checkbox" id="cb_wir"></td><td>Who-Is-Router</td><td id="pps_wir"></td><td id="spp_wir"></td><td id="rel_wir"></td></tr>
+          <tr><td id="td_iar"><input type="checkbox" id="cb_iar"></td><td>I-Am-Router</td><td id="pps_iar"></td><td id="spp_iar"></td><td id="rel_iar"></td></tr>
+          <tr><td id="td_o"><input type="checkbox" id="cb_o"></td><td>Other</td><td id="pps_o"></td><td id="spp_o"></td><td id="rel_o"></td></tr>
+          <tr><td id="td_tot"><input type="checkbox" id="cb_tot"></td><td>Total</td><td id="pps_tot"></td><td id="spp_tot"></td><td>100%</td></tr>
+        </tbody>
+      </table>
+      <br>
+      <h4>Packets/Second Graphed Over Time For Selected Broadcast Types</h4>
+      <div id="graphContainer" style="padding-bottom:3em"></div>
+    </div>
+    <script>
+      var lines = null;
+      var changeAllowed = true;
+      const f = (name)=>{
+        const td = document.getElementById("td_"+name);
+        const cb = document.getElementById("cb_"+name);
+        cb.checked = name!="tot";
+        cb.style.width = "1.3em";
+        cb.style.height = "1.3em";
+        cb.style.verticalAlign = "middle";
+        cb.oninput = ()=>{
+          draw();
+        };
+        cb.onclick = (e)=>{
+          if (e.ctrlKey && changeAllowed){
+            for (const i of document.getElementById("type_body").getElementsByTagName("INPUT")){
+              if (i.getAttribute("type")=="checkbox"){
+                i.checked = cb.checked;
+              }
+            }
+          }
+        };
+        td.onclick = (e)=>{
+          if (e.target===cb || !changeAllowed){ return; }
+          cb.checked = !cb.checked;
+          cb.onclick(e);
+          cb.oninput();
+        };
+        td.setAttribute("title","'CTRL+Left Click' to select or deselect all checkboxes at once.");
+      };
+      f("ucov");
+      f("wi");
+      f("ia");
+      f("wh");
+      f("ih");
+      f("wir");
+      f("iar");
+      f("o");
+      f("tot");
+      draw();
+      refresh();
+    </script>
+  </body>
+</html>

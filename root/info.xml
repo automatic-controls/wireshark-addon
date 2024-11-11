@@ -1,0 +1,6 @@
+<extension version="1">
+  <name>WiresharkAnalyzer</name>
+  <description>A monitoring tool designed to analyze traffic on BACnet/IP networks.</description>
+  <version>0.1.0</version>
+  <vendor>Automatic Controls Equipment Systems, Inc.</vendor>
+</extension>
