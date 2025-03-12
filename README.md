@@ -2,7 +2,7 @@
 
 WebCTRL is a trademark of Automated Logic Corporation. Any other trademarks mentioned herein are the property of their respective owners.
 
-Please see [documentation.md](./root/webapp/documentation.md). Note the third-party library <https://www.aboutsip.com/pktsio/> is used as a low-level PCAP file parser.
+Please see [documentation.md](./root/webapp/documentation.md). Note the third-party library https://www.aboutsip.com/pktsio/ is used as a low-level PCAP file parser.
 
 ## Add-On Installation
 

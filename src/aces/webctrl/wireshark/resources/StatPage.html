@@ -289,7 +289,7 @@
             const x = xFn(time);
             ctx.moveTo(x,0);
             ctx.lineTo(x,h);
-            time+=86400;
+            time+=604800;
           }
           ctx.stroke();
         }
@@ -310,15 +310,16 @@
             }
           }
           ctx.stroke();
-          ctx.fillStyle = "white";
-          ctx.beginPath();
-          for (var i = 0; i < xData.length; ++i) {
-            const x = xxData[i];
-            const y = yFn(lines[i][name]/(lines[i]["end"]-lines[i]["start"]));
-            ctx.moveTo(x, y);
-            ctx.arc(x, y, 2, 0, 2 * Math.PI);
-          }
-          ctx.fill();
+          // Uncomment to draw a white dot at each data-point
+          //ctx.fillStyle = "white";
+          //ctx.beginPath();
+          //for (var i = 0; i < xData.length; ++i) {
+          //  const x = xxData[i];
+          //  const y = yFn(lines[i][name]/(lines[i]["end"]-lines[i]["start"]));
+          //  ctx.moveTo(x, y);
+          //  ctx.arc(x, y, 2, 0, 2 * Math.PI);
+          //}
+          //ctx.fill();
         }
         graph.replaceChildren(canvas);
       }
